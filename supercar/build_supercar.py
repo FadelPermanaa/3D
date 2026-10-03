@@ -1,4 +1,4 @@
-"""Procedural McLaren-style supercar for Blender (bpy 4.2+ / 5.x).
+"""Procedural McLaren Senna-style hypercar for Blender (bpy 4.2+ / 5.x).
 
 Builds the car from lofted cross-sections, cuts arches/intakes/vents with
 booleans, then renders previews and exports GLB, FBX (Roblox-ready) and .blend.
@@ -22,7 +22,7 @@ PREVIEW = "--preview" in sys.argv
 RENDER = "--no-render" not in sys.argv
 
 # ---- Tweakables -------------------------------------------------------------
-PAINT = (0.95, 0.33, 0.02)          # papaya orange
+PAINT = (0.07, 0.17, 0.42)          # Senna-style metallic blue
 LENGTH = 4.55                       # metres, nose to tail
 WHEELBASE = 2.67
 FRONT_AXLE_Y = -1.36                # front of car points to -Y
@@ -53,15 +53,15 @@ def material(name, color, metallic=0.0, rough=0.5, coat=0.0, emit=0.0):
 
 
 M = {
-    "paint": material("Paint", PAINT, metallic=0.35, rough=0.22, coat=1.0),
+    "paint": material("Paint", PAINT, metallic=0.7, rough=0.28, coat=1.0),
     "black": material("GlossBlack", (0.012, 0.012, 0.013), rough=0.18, coat=0.6),
     "trim": material("SatinBlack", (0.02, 0.02, 0.022), rough=0.55),
     "carbon": material("Carbon", (0.03, 0.032, 0.035), metallic=0.3, rough=0.35, coat=0.8),
     "glass": material("Glass", (0.015, 0.02, 0.025), metallic=0.1, rough=0.03, coat=1.0),
     "tyre": material("Tyre", (0.025, 0.025, 0.025), rough=0.85),
-    "rim": material("Rim", (0.10, 0.10, 0.11), metallic=1.0, rough=0.28),
+    "rim": material("Rim", (0.62, 0.63, 0.65), metallic=1.0, rough=0.22),
     "disc": material("BrakeDisc", (0.35, 0.34, 0.33), metallic=1.0, rough=0.45),
-    "caliper": material("Caliper", (0.75, 0.55, 0.05), rough=0.3, coat=0.5),
+    "caliper": material("Caliper", (1.0, 0.32, 0.02), rough=0.3, coat=0.5),
     "chrome": material("Chrome", (0.8, 0.8, 0.82), metallic=1.0, rough=0.08),
     "headlight": material("Headlight", (1.0, 0.97, 0.9), emit=6.0),
     "taillight": material("Taillight", (1.0, 0.02, 0.01), emit=8.0),
@@ -222,7 +222,12 @@ def arch(y, r):
 
 def side_scoops(bm):
     for s in (-1, 1):
-        ellipsoid(bm, (s * 1.02, 0.42, 0.56), (0.22, 0.62, 0.19), rot=(math.radians(-8), 0, 0))
+        ellipsoid(bm, (s * 1.02, 0.58, 0.56), (0.22, 0.55, 0.19), rot=(math.radians(-8), 0, 0))
+
+
+def door_glass(bm):
+    for s in (-1, 1):
+        ellipsoid(bm, (s * 0.94, -0.40, 0.45), (0.09, 0.40, 0.10), rot=(math.radians(4), 0, 0))
 
 
 def front_intakes(bm):
@@ -233,12 +238,14 @@ def front_intakes(bm):
 
 def headlight_sockets(bm):
     for s in (-1, 1):
-        ellipsoid(bm, (s * 0.64, -2.14, 0.53), (0.30, 0.24, 0.06), rot=(math.radians(-14), s * math.radians(10), s * math.radians(28)), segs=8)
+        ellipsoid(bm, (s * 0.62, -2.02, 0.50), (0.32, 0.26, 0.085), rot=(math.radians(-14), s * math.radians(10), s * math.radians(28)), segs=8)
 
 
 def hood_vents(bm):
     for s in (-1, 1):
-        box(bm, (s * 0.36, -1.72, 0.74), (0.34, 0.20, 0.10), rot=(math.radians(10), 0, s * math.radians(-8)))
+        # large louvred openings on top of the front fenders
+        box(bm, (s * 0.58, -1.80, 0.70), (0.36, 0.42, 0.12), rot=(math.radians(8), s * math.radians(14), s * math.radians(-18)))
+    box(bm, (0, -1.95, 0.64), (0.40, 0.30, 0.10), rot=(math.radians(12), 0, 0))    # nose duct
 
 
 def rear_openings(bm):
@@ -252,6 +259,7 @@ cuts = cutter_collection("BodyCuts", [
     ("cut_arch_f", M["trim"], arch(FRONT_AXLE_Y, R_FRONT)),
     ("cut_arch_r", M["trim"], arch(REAR_AXLE_Y, R_REAR)),
     ("cut_scoops", M["trim"], side_scoops),
+    ("cut_door_glass", M["glass"], door_glass),
     ("cut_intakes", M["trim"], front_intakes),
     ("cut_lights", M["lens"], headlight_sockets),
     ("cut_vents", M["trim"], hood_vents),
@@ -261,6 +269,48 @@ boolean_cut(body, cuts)
 bake(body)
 remove_collection(cuts)
 body.data.set_sharp_from_angle(angle=math.radians(40))
+
+
+CARBON_Z, NOSE_Y, TAIL_Y = 0.31, -1.75, 1.75
+
+
+def carbon_line(y):
+    """Height below which the body is bare carbon; rises toward the nose and the tail."""
+    return CARBON_Z + 0.36 * max(0.0, -y + NOSE_Y) + 0.25 * max(0.0, y - TAIL_Y)
+
+
+def zone_materials(ob):
+    """Senna-style two-tone: carbon lower body and a dark nose centre, split on clean cut lines."""
+    me = ob.data
+    bm = bmesh.new()
+    bm.from_mesh(me)
+    planes = [
+        ((0, 0, CARBON_Z), (0, 0, 1)),
+        ((0, NOSE_Y, CARBON_Z), (0, 0.36, 1)),
+        ((0, TAIL_Y, CARBON_Z), (0, -0.25, 1)),
+        ((0.30, 0, 0), (1, 0, 0)),
+        ((-0.30, 0, 0), (1, 0, 0)),
+        ((0, -1.55, 0), (0, 1, 0)),
+    ]
+    for co, no in planes:
+        geom = bm.verts[:] + bm.edges[:] + bm.faces[:]
+        bmesh.ops.bisect_plane(bm, geom=geom, plane_co=co, plane_no=no)
+    names = [m.name for m in me.materials]
+    if M["carbon"].name not in names:
+        me.materials.append(M["carbon"])
+        names.append(M["carbon"].name)
+    paint, carbon = names.index("Paint"), names.index(M["carbon"].name)
+    for f in bm.faces:
+        if f.material_index != paint:
+            continue
+        c = f.calc_center_median()
+        if c.z < carbon_line(c.y) or (f.normal.z > 0.35 and abs(c.x) < 0.30 and c.y < -1.55):
+            f.material_index = carbon
+    bm.to_mesh(me)
+    bm.free()
+
+
+zone_materials(body)
 
 # ---- Cabin / greenhouse -----------------------------------------------------
 gt = np.linspace(0.27, 0.79, 48)
@@ -278,13 +328,28 @@ sub.levels = sub.render_levels = 2
 bake(cabin)
 cabin.data.set_sharp_from_angle(angle=math.radians(50))
 
+def roof_scoop(bm):
+    tt = 0.60
+    z = float(np.interp(tt, gt, g_top))
+    ellipsoid(bm, (0, y_at(tt), z + 0.005), (0.12, 0.40, 0.045), segs=24)
+
+
+def roof_scoop_mouth(bm):
+    tt = 0.555
+    z = float(np.interp(tt, gt, g_top))
+    ellipsoid(bm, (0, y_at(tt), z + 0.025), (0.08, 0.03, 0.025), segs=16)
+
+
+single("RoofScoop", M["paint"], roof_scoop)
+single("RoofScoopIntake", M["black"], roof_scoop_mouth)
+
 # ---- Lights -----------------------------------------------------------------
 def headlights(bm):
     for s in (-1, 1):
         # two LED blades set inside each socket, aligned with it
         rot = (math.radians(-14), s * math.radians(10), s * math.radians(28))
-        box(bm, (s * 0.645, -2.145, 0.525), (0.24, 0.03, 0.012), rot=rot)
-        box(bm, (s * 0.60, -2.16, 0.505), (0.10, 0.03, 0.012), rot=rot)
+        box(bm, (s * 0.63, -2.03, 0.52), (0.24, 0.03, 0.012), rot=rot)      # upper LED blade
+        box(bm, (s * 0.58, -2.05, 0.485), (0.15, 0.03, 0.010), rot=rot)      # lower LED blade
 
 
 single("Headlights", M["headlight"], headlights)
@@ -301,7 +366,7 @@ single("Taillights", M["taillight"], taillights, smooth=False)
 
 # ---- Aero & trim --------------------------------------------------------------
 def splitter(bm):
-    box(bm, (0, -2.02, 0.085), (1.62, 0.50, 0.022))
+    box(bm, (0, -2.06, 0.08), (1.74, 0.58, 0.024))
     for s in (-1, 1):
         box(bm, (s * 0.80, -1.98, 0.14), (0.018, 0.34, 0.09))   # splitter end fences
 
@@ -322,7 +387,14 @@ def rear_mesh(bm):
     box(bm, (0, 2.25, 0.64), (1.52, 0.02, 0.24))
 
 
+def canards(bm):
+    for s in (-1, 1):
+        for z, yy in ((0.30, -2.07), (0.40, -2.00)):
+            box(bm, (s * 0.86, yy + 0.12, z), (0.18, 0.22, 0.012), rot=(math.radians(-6), s * math.radians(-10), s * math.radians(-25)))
+
+
 single("Splitter", M["carbon"], splitter, smooth=False)
+single("Canards", M["carbon"], canards, smooth=False)
 single("SideSkirts", M["carbon"], side_skirts, smooth=False)
 single("Diffuser", M["carbon"], diffuser, smooth=False)
 single("RearGrille", M["trim"], rear_mesh, smooth=False)
@@ -330,14 +402,14 @@ single("RearGrille", M["trim"], rear_mesh, smooth=False)
 
 def exhausts(bm):
     for s in (-1, 1):
-        cyl = Matrix.Translation((s * 0.13, 2.22, 0.66)) @ Matrix.Rotation(math.pi / 2, 4, "X")
-        bmesh.ops.create_cone(bm, cap_ends=True, segments=32, radius1=0.065, radius2=0.065, depth=0.18, matrix=cyl)
+        cyl = Matrix.Translation((s * 0.10, 1.98, 0.97)) @ Matrix.Rotation(math.radians(-35), 4, "X")
+        bmesh.ops.create_cone(bm, cap_ends=True, segments=32, radius1=0.055, radius2=0.06, depth=0.16, matrix=cyl)
 
 
 single("Exhausts", M["chrome"], exhausts)
 
 
-def airfoil_wing(bm, span=1.72, chord=0.34, thick=0.10, camber=0.05, n=20):
+def airfoil_wing(bm, span=1.80, chord=0.42, thick=0.10, camber=0.06, n=20):
     """NACA 4-digit style section (chord along +Y), extruded along X."""
     upper, lower = [], []
     for i in range(n + 1):
@@ -360,13 +432,14 @@ def airfoil_wing(bm, span=1.72, chord=0.34, thick=0.10, camber=0.05, n=20):
 wing = single("RearWing", M["carbon"], airfoil_wing)
 wing.data.set_sharp_from_angle(angle=math.radians(30))
 wing.rotation_euler = (math.radians(12), 0, 0)
-wing.location = (0, 1.86, 1.16)
+wing.location = (0, 1.80, 1.24)
 
 
 def wing_parts(bm):
     for s in (-1, 1):
-        box(bm, (s * 0.87, 2.0, 1.14), (0.012, 0.46, 0.20))                         # endplates
-        box(bm, (s * 0.38, 1.96, 1.05), (0.025, 0.14, 0.22), rot=(math.radians(-18), 0, 0))  # swan-neck pylons
+        box(bm, (s * 0.905, 2.0, 1.25), (0.014, 0.48, 0.17))                        # endplates
+        box(bm, (s * 0.30, 2.02, 1.16), (0.03, 0.12, 0.30), rot=(math.radians(-22), 0, 0))  # swan-neck pylons
+        box(bm, (s * 0.30, 2.07, 1.30), (0.03, 0.18, 0.04))                            # pylon hook over the wing
 
 
 single("WingSupports", M["carbon"], wing_parts, smooth=False)
@@ -376,7 +449,7 @@ def mirrors(bm):
     for s in (-1, 1):
         # stalk rises from the door top to the pod
         box(bm, (s * 0.80, -0.66, 0.78), (0.035, 0.05, 0.16), rot=(0, s * math.radians(-40), 0))
-        ellipsoid(bm, (s * 0.88, -0.67, 0.84), (0.10, 0.07, 0.055), segs=20)
+        ellipsoid(bm, (s * 0.90, -0.67, 0.82), (0.10, 0.07, 0.05), segs=20)
 
 
 single("Mirrors", M["carbon"], mirrors)
@@ -417,12 +490,12 @@ def wheel(name, y, side, r, width, track):
     bmesh.ops.create_cone(bm, cap_ends=False, segments=64, radius1=rim_r * 1.02, radius2=rim_r * 1.02,
                           depth=0.02, matrix=lip)
     # 5 twin spokes, dished outward
-    for k_ in range(5):
-        for off in (-0.13, 0.13):
-            ang = 2 * math.pi * k_ / 5 + off
+    for k_ in range(10):
+        for off in (0.0,):
+            ang = 2 * math.pi * k_ / 10 + off
             Mt = (Matrix.Translation((s * (width / 2 - 0.03), 0, 0)) @ Matrix.Rotation(ang, 4, "X")
                   @ Matrix.Translation((0, 0, rim_r * 0.52)) @ Matrix.Rotation(-s * math.radians(8), 4, "Y")
-                  @ Matrix.Diagonal((0.035, 0.032, rim_r * 0.92, 1)))
+                  @ Matrix.Diagonal((0.03, 0.026, rim_r * 0.94, 1)))
             bmesh.ops.create_cube(bm, size=1.0, matrix=Mt)
     cylinder_x(bm, (s * (width / 2 - 0.025), 0, 0), 0.075, 0.05, segments=32)
     bm.faces.ensure_lookup_table()

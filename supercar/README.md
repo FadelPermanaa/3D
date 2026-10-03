@@ -1,7 +1,10 @@
-# Supercar (McLaren-style)
+# Hypercar (McLaren Senna-style)
 
-A papaya-orange, McLaren-inspired supercar generated entirely by a Blender Python
-script. No badges or logos: it is an original design in that style.
+A McLaren Senna-inspired hypercar generated entirely by a Blender Python script,
+modelled after the reference photo `images.jfif`: metallic blue over a carbon lower
+body, dark "eye" headlights with LED blades, fender-top vents, glass lower-door
+panels, a roof scoop, top-exit exhausts, a big swan-neck wing, silver 10-spoke
+wheels and orange calipers. No badges or logos are modelled.
 
 ![front](out/render_front34.png)
 
@@ -23,8 +26,8 @@ script. No badges or logos: it is an original design in that style.
 
 Each part is a separate object, so you can recolour or script them on their own:
 
-- `Body`, `Cabin` (glass), `Mirrors`, `Headlights`, `Taillights`
-- `Splitter`, `SideSkirts`, `Diffuser`, `RearWing`, `WingSupports`, `RearGrille`, `Exhausts`
+- `Body` (blue paint + carbon lower), `Cabin` (glass), `RoofScoop`, `Mirrors`, `Headlights`, `Taillights`
+- `Splitter`, `Canards`, `SideSkirts`, `Diffuser`, `RearWing`, `WingSupports`, `RearGrille`, `Exhausts`
 - `Wheel_FL`, `Wheel_FR`, `Wheel_RL`, `Wheel_RR`: tyre, rim and brake disc, with the
   origin at the hub so they can spin (in Roblox, attach them with `HingeConstraint`s)
 - `Calipers`: these stay fixed and don't spin with the wheels
